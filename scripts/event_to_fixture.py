@@ -2,8 +2,8 @@
 """Convert a raw Sentry event (JSON) into a small, sanitized fixture for tests.
 
 Usage:
-    python event_to_fixture.py event.json > tests/fixtures/sentry_<id>.json
-    cat event.json | python event_to_fixture.py - > fixture.json
+    python scripts/event_to_fixture.py event.json > tests/fixtures/sentry_<id>.json
+    cat event.json | python scripts/event_to_fixture.py - > fixture.json
 
 Handles both the Sentry API shape (``entries`` list) and the SDK/envelope shape
 (top-level ``exception`` / ``request`` / ``breadcrumbs``).
