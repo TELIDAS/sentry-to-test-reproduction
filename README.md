@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # sentry-to-test-reproduction
 
 Claude Code skill that turns a Sentry error into a **failing reproduction test**, using real (sanitized) event data and the project's own test framework: `CLAUDE.md` first, repo signals second, **pytest by default**.
@@ -66,3 +67,7 @@ Sentry events contain user data. The sanitizer masks common PII and secrets, but
 ## License
 
 MIT
+=======
+# sentry-to-test-reproduction-
+Claude Code skill that turns a Sentry error into a failing reproduction test, using real event data and the project's own test framework (CLAUDE.md first, pytest by default).
+>>>>>>> d0e27eb770a609b946fbb0342c8cb23a47ea8a24
