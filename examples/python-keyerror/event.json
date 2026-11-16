@@ -5,7 +5,7 @@
   "platform": "python",
   "release": "1.8.3",
   "tags": [{"key": "environment", "value": "production"}, {"key": "runtime", "value": "CPython 3.12"}],
-  "user": {"email": "jane.doe@gmail.com", "ip_address": "203.0.113.42"},
+  "user": {"email": "jane@example.com", "ip_address": "203.0.113.42"},
   "entries": [
     {
       "type": "exception",
@@ -18,7 +18,7 @@
               "frames": [
                 {"filename": "app/orders.py", "function": "create_order", "lineno": 41, "in_app": true,
                  "context_line": "    total = calc_total(items, order['discount'])",
-                 "vars": {"order": {"items": [{"sku": "A1", "price": 100}], "customer_email": "jane.doe@gmail.com"}}},
+                 "vars": {"order": {"items": [{"sku": "A1", "price": 100}], "customer_email": "jane@example.com"}}},
                 {"filename": "app/pricing.py", "function": "calc_total", "lineno": 12, "in_app": true,
                  "context_line": "    return subtotal - discount"}
               ]
@@ -33,7 +33,7 @@
         "method": "POST",
         "url": "https://shop.example.com/api/orders",
         "headers": [["Authorization", "Bearer abcdefghijklmnopqrstuvwxyz0123456789"], ["Content-Type", "application/json"]],
-        "data": {"items": [{"sku": "A1", "price": 100}], "customer_email": "jane.doe@gmail.com"}
+        "data": {"items": [{"sku": "A1", "price": 100}], "customer_email": "jane@example.com"}
       }
     },
     {

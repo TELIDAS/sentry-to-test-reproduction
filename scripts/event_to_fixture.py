@@ -8,31 +8,91 @@ Usage:
 Handles both the Sentry API shape (``entries`` list) and the SDK/envelope shape
 (top-level ``exception`` / ``request`` / ``breadcrumbs``).
 
-PII handling: masks values of sensitive keys, emails, IPv4 addresses, bearer
-tokens and long hex/base64-like secrets. Review the output before committing.
+PII handling: masks common identity/credential keys, emails, IPv4/IPv6 addresses,
+URL credentials and sensitive query parameters, bearer tokens, and long
+secret-like strings. Automated detection is incomplete; review output before use.
 """
 import json
+import ipaddress
 import re
 import sys
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-SENSITIVE_KEYS = re.compile(
-    r"(pass(word)?|secret|token|api[_-]?key|authorization|cookie|session|"
-    r"csrf|ssn|card|cvv|email|phone|ip_address|auth)",
-    re.IGNORECASE,
-)
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+IPV6_CANDIDATE_RE = re.compile(r"(?<![\w:])(?:[0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{0,4}(?![\w:])")
 BEARER_RE = re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]+")
 SECRET_RE = re.compile(r"\b[A-Za-z0-9_\-]{32,}\b")
+URL_RE = re.compile(r"https?://[^\s\"'<>]+", re.IGNORECASE)
+URL_USERINFO_RE = re.compile(r"(?i)(https?://)[^/@\s]+@")
+SENSITIVE_KEY_PARTS = {
+    "address", "api_key", "auth", "authorization", "birth_date", "card",
+    "client_ip", "cookie", "csrf", "cvv", "date_of_birth", "dob", "email",
+    "first_name", "full_name", "ip", "ip_address", "last_name", "mobile",
+    "name", "password", "passwd", "phone", "postal_code", "pwd", "remote_addr",
+    "secret", "session", "ssn", "street", "token", "user", "user_id",
+    "username", "zip_code",
+}
 
 MASK = "[REDACTED]"
 MAX_BREADCRUMBS = 30
 MAX_STR = 2000
 
 
-def scrub_str(value: str) -> str:
+def normalize_key(key) -> str:
+    value = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", str(key))
+    return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
+
+
+def is_sensitive_key(key) -> bool:
+    parts = set(normalize_key(key).split("_"))
+    normalized = normalize_key(key)
+    return normalized in SENSITIVE_KEY_PARTS or bool(parts & SENSITIVE_KEY_PARTS)
+
+
+def scrub_url(value: str) -> str:
+    try:
+        parts = urlsplit(value)
+        if not parts.scheme or not parts.netloc:
+            return value
+        host = parts.hostname or ""
+        if ":" in host and not host.startswith("["):
+            host = f"[{host}]"
+        if parts.port:
+            host = f"{host}:{parts.port}"
+        if parts.username is not None or parts.password is not None:
+            host = f"{MASK}@{host}"
+        query = urlencode(
+            [(key, MASK if is_sensitive_key(key) else val)
+             for key, val in parse_qsl(parts.query, keep_blank_values=True)],
+            doseq=True,
+        )
+        fragment = parts.fragment
+        if "=" in fragment:
+            fragment = urlencode(
+                [(key, MASK if is_sensitive_key(key) else val)
+                 for key, val in parse_qsl(fragment.lstrip("?"), keep_blank_values=True)],
+                doseq=True,
+            )
+        return urlunsplit((parts.scheme, host, parts.path, query, fragment))
+    except ValueError:
+        # Do not leak URL userinfo even if parsing fails on a malformed port.
+        return URL_USERINFO_RE.sub(rf"\1{MASK}@", value)
+
+
+def scrub_text(value: str) -> str:
     value = EMAIL_RE.sub("user@example.com", value)
     value = IPV4_RE.sub("0.0.0.0", value)
+
+    def mask_ipv6(match):
+        candidate = match.group(0)
+        try:
+            ipaddress.IPv6Address(candidate)
+            return "::"
+        except ipaddress.AddressValueError:
+            return candidate
+
+    value = IPV6_CANDIDATE_RE.sub(mask_ipv6, value)
     value = BEARER_RE.sub(lambda m: f"{m.group(1)} {MASK}", value)
     value = SECRET_RE.sub(MASK, value)
     if len(value) > MAX_STR:
@@ -40,17 +100,24 @@ def scrub_str(value: str) -> str:
     return value
 
 
+def scrub_str(value: str) -> str:
+    value = URL_RE.sub(lambda m: scrub_url(m.group(0)), value)
+    return scrub_text(value)
+
+
 def scrub(obj, key=None):
-    if key is not None and SENSITIVE_KEYS.search(str(key)):
+    if key is not None and is_sensitive_key(key):
         return MASK
     if isinstance(obj, dict):
         return {k: scrub(v, k) for k, v in obj.items()}
     if isinstance(obj, list):
         # header-style pairs: ["Cookie", "..."]
-        if len(obj) == 2 and isinstance(obj[0], str) and SENSITIVE_KEYS.search(obj[0]):
+        if len(obj) == 2 and isinstance(obj[0], str) and is_sensitive_key(obj[0]):
             return [obj[0], MASK]
         return [scrub(v) for v in obj]
     if isinstance(obj, str):
+        if normalize_key(key or "") in {"query", "query_string", "querystring"} and "=" in obj:
+            return scrub_str(scrub_url(f"https://redaction.invalid/?{obj.lstrip('?')}").split("?", 1)[1])
         return scrub_str(obj)
     return obj
 
@@ -152,7 +219,11 @@ def main(argv):
     if len(argv) != 2:
         sys.stderr.write(__doc__)
         return 2
-    raw = sys.stdin.read() if argv[1] == "-" else open(argv[1], encoding="utf-8").read()
+    if argv[1] == "-":
+        raw = sys.stdin.read()
+    else:
+        with open(argv[1], encoding="utf-8") as source:
+            raw = source.read()
     event = json.loads(raw)
     json.dump(build_fixture(event), sys.stdout, indent=2, ensure_ascii=False)
     sys.stdout.write("\n")

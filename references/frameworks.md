@@ -1,10 +1,11 @@
 # Language and test framework detection
 
-Read this when CLAUDE.md does not say which framework to use. Pick by repo signals; if several match, prefer the one used by the module that contains the failing frame.
+Use this after checking the applicable agent instructions, testing docs, and nearby tests. Pick by repository signals; if several match, prefer the runner used by the module containing the failing frame.
 
 | Signal in repo | Language | Framework | Typical command |
 |---|---|---|---|
-| `pyproject.toml` / `pytest.ini` / `conftest.py` | Python | pytest | `pytest path/to/test.py -x -q` |
+| `pyproject.toml` with pytest config/dependency, `pytest.ini`, `setup.cfg`, `tox.ini`, or `conftest.py` | Python | pytest | `pytest path/to/test.py -x -q` |
+| Existing `unittest.TestCase` tests and no pytest configuration | Python | unittest | `python -m unittest path.to.test_module` |
 | `manage.py` + `tests.py` without pytest | Python | Django test runner | `python manage.py test app.tests.TestCase` |
 | `package.json` with `jest` | JS/TS | Jest | `npx jest path/to/file.test.ts` |
 | `package.json` with `vitest` | JS/TS | Vitest | `npx vitest run path/to/file.test.ts` |
@@ -15,4 +16,4 @@ Read this when CLAUDE.md does not say which framework to use. Pick by repo signa
 | `composer.json` with `phpunit` | PHP | PHPUnit | `vendor/bin/phpunit --filter Issue123` |
 | `*.csproj` | C# | xUnit/NUnit | `dotnet test --filter Issue123` |
 
-Default when nothing matches: Python + pytest, file `tests/test_issue_<id>_<short_description>.py`.
+If no signal matches, identify the language from the failing source and inspect its manifests, scripts, dependencies, and neighboring tests. Use pytest as the final fallback only for a Python project. For a non-Python project or unresolved ambiguity, ask the user which runner to use rather than creating a test in an arbitrary framework.
