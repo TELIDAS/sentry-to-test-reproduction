@@ -1,0 +1,84 @@
+{
+  "sentry": {
+    "event_id": "abc123def4567890abc123def4567890",
+    "issue_id": "4242",
+    "title": "KeyError: 'discount'",
+    "platform": "python",
+    "release": "1.8.3",
+    "environment": "production"
+  },
+  "exception": [
+    {
+      "type": "KeyError",
+      "value": "'discount'",
+      "module": null,
+      "mechanism": null,
+      "frames": [
+        {
+          "filename": "app/orders.py",
+          "module": null,
+          "function": "create_order",
+          "lineno": 41,
+          "in_app": true,
+          "context_line": "    total = calc_total(items, order['discount'])",
+          "vars": {
+            "order": {
+              "items": [
+                {
+                  "sku": "A1",
+                  "price": 100
+                }
+              ],
+              "customer_email": "[REDACTED]"
+            }
+          }
+        },
+        {
+          "filename": "app/pricing.py",
+          "module": null,
+          "function": "calc_total",
+          "lineno": 12,
+          "in_app": true,
+          "context_line": "    return subtotal - discount",
+          "vars": null
+        }
+      ]
+    }
+  ],
+  "request": {
+    "method": "POST",
+    "url": "https://shop.example.com/api/orders",
+    "query": null,
+    "headers": [
+      [
+        "Authorization",
+        "[REDACTED]"
+      ],
+      [
+        "Content-Type",
+        "application/json"
+      ]
+    ],
+    "data": {
+      "items": [
+        {
+          "sku": "A1",
+          "price": 100
+        }
+      ],
+      "customer_email": "[REDACTED]"
+    }
+  },
+  "tags": {
+    "environment": "production",
+    "runtime": "CPython 3.12"
+  },
+  "breadcrumbs": [
+    {
+      "category": "http",
+      "level": "info",
+      "message": "POST /api/orders from 0.0.0.0"
+    }
+  ],
+  "contexts": null
+}
