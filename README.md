@@ -2,7 +2,7 @@
 
 An agent skill that turns a Sentry issue into a failing reproduction test using the project's own language and test framework.
 
-The official Sentry MCP provides issue and event data. This skill explains how to inspect that data, identify the failing code path, sanitize a fixture, and write a test that reproduces the reported error. The bundled Python script handles deterministic fixture extraction and common PII masking; a separate MCP server is not needed.
+The official Sentry MCP provides issue and event data. The skill writes the reproduction in the language and test stack used by the affected project, including frontend and native mobile projects. The bundled Python script is only an optional language-independent event-fixture sanitizer; it is not the test framework default, and no extra MCP server is needed for sanitization.
 
 ## Repository layout
 
@@ -19,18 +19,24 @@ sentry-repro/
 
 ## Requirements
 
-- An agent environment that can use the official [Sentry MCP](https://github.com/getsentry/sentry-mcp). Without it, provide the event JSON or stack trace directly.
 - Python 3 to run the sanitizer (standard library only).
+- The official [Sentry MCP](https://github.com/getsentry/sentry-mcp) connected in your coding-agent environment. The skill uses that existing connection; installing the skill does not configure MCP. If MCP is unavailable, it tells you instead of claiming it fetched an issue.
 
 ## Install
 
-Install from the existing GitHub repository:
+Install into any supported coding agent with the `skills` CLI. It detects installed agents and lets you choose where to install. Node.js 22.20 or later is required by the current CLI.
 
 ```bash
 npx skills add https://github.com/TELIDAS/sentry-to-test-reproduction --skill sentry-repro
 ```
 
-Or copy `SKILL.md`, `scripts/`, and `references/` into your agent's skill directory.
+To install into Claude Code and Codex project directories directly:
+
+```bash
+npx skills add https://github.com/TELIDAS/sentry-to-test-reproduction --skill sentry-repro -a claude-code -a codex
+```
+
+The same `SKILL.md` works across supported agents, including Claude Code, Codex, Cursor, and others. You can also use `-g` for user-wide installation. See the [`skills` CLI supported agents](https://github.com/vercel-labs/skills/blob/main/docs/agents.md) for current agents and install paths. Configure the Sentry MCP separately in each agent where you want the skill to fetch issues; installing a skill does not create an MCP connection.
 
 ## Usage
 
@@ -40,13 +46,13 @@ Ask your coding agent:
 Reproduce https://your-org.sentry.io/issues/4242/
 ```
 
-Or provide the event directly:
+Or provide an already sanitized event, if your data policy permits:
 
 ```text
-Write a failing reproduction test for this Sentry event, then stop: <event JSON>
+Write a failing reproduction test for this sanitized Sentry event, then stop: <sanitized event>
 ```
 
-The workflow follows the active agent's instructions (`CLAUDE.md`, `AGENTS.md`, or equivalent), then testing documentation, project configuration, and nearby tests. If no Markdown guidance exists, it infers the runner from manifests, scripts, dependencies, and source files. Python + pytest is the fallback only for an otherwise unidentified Python project; if language or runner is still unclear, it asks before writing a test. It stops after the failing reproduction unless you ask for a fix.
+The skill fetches event data through the existing Sentry MCP connection, follows the project's test conventions, and stops after verifying the failing reproduction unless you ask for a fix.
 
 ## Sanitize an event manually
 
